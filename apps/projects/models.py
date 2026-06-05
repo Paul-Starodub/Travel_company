@@ -8,7 +8,8 @@ class TravelProject(models.Model):
 
     @property
     def is_completed(self) -> bool:
-        return self.places.exists() and not self.places.filter(visited=False).exists()
+        places = list(self.places.all())
+        return bool(places) and all(place.visited for place in places)
 
     def __str__(self) -> str:
         return self.name

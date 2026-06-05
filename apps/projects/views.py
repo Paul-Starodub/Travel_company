@@ -21,7 +21,7 @@ class TravelProjectViewSet(viewsets.ModelViewSet):
     ordering_fields = ["start_date", "name"]
 
     def get_queryset(self):
-        qs = TravelProject.objects.all()
+        qs = TravelProject.objects.prefetch_related("places")
         completed = self.request.query_params.get("completed")
         if completed is not None:
             flag = completed.lower() == "true"
