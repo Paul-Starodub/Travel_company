@@ -11,6 +11,11 @@ class ProjectPlaceReadSerializer(serializers.ModelSerializer):
         fields = ["id", "external_id", "title", "notes", "visited"]
 
 
+class PlaceInputSerializer(serializers.Serializer):
+    external_id = serializers.CharField()
+    notes = serializers.CharField(required=False, allow_blank=True, default="")
+
+
 class ProjectPlaceCreateSerializer(serializers.Serializer):
     external_id = serializers.CharField()
     notes = serializers.CharField(required=False, allow_blank=True, default="")
@@ -38,15 +43,48 @@ class ProjectPlaceCreateSerializer(serializers.Serializer):
         )
 
 
+class ProjectPlaceBulkCreateSerializer(serializers.Serializer):
+    places = PlaceInputSerializer(many=True, min_length=1)
+
+    def validate(self, attrs) -> dict:
+        project = self.context["project"]
+        items = attrs["places"]
+        if project.places.count() + len(items) > 10:
+            raise serializers.ValidationError(f"Adding {len(items)} place(s) would exceed the maximum of 10.")
+        seen_ids = set()
+        enriched = []
+        for item in items:
+            eid = item["external_id"]
+            if eid in seen_ids:
+                raise serializers.ValidationError(f"Duplicate place '{eid}' in the request.")
+            seen_ids.add(eid)
+            if project.places.filter(external_id=eid).exists():
+                raise serializers.ValidationError(f"Place '{eid}' is already in the project.")
+            artwork = ArtInstituteService.get_artwork(eid)
+            if not artwork:
+                raise serializers.ValidationError(f"Place '{eid}' not found in Art Institute API.")
+            enriched.append({**item, "artwork": artwork})
+        attrs["places"] = enriched
+        return attrs
+
+    @transaction.atomic
+    def save(self, **kwargs) -> list[ProjectPlace]:
+        project = self.context["project"]
+        return [
+            ProjectPlace.objects.create(
+                project=project,
+                external_id=str(item["artwork"]["id"]),
+                title=item["artwork"]["title"],
+                notes=item.get("notes", ""),
+            )
+            for item in self.validated_data["places"]
+        ]
+
+
 class ProjectPlaceUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectPlace
         fields = ["notes", "visited"]
-
-
-class PlaceInputSerializer(serializers.Serializer):
-    external_id = serializers.CharField()
-    notes = serializers.CharField(required=False, allow_blank=True, default="")
 
 
 class TravelProjectSerializer(serializers.ModelSerializer):
