@@ -5,7 +5,7 @@ from django.core.cache import cache
 
 
 class ArtInstituteService:
-    BASE_URL = os.getenv("ART_INSTITUTE_API_URL", "https://api.artic.edu/api/v1")
+    BASE_URL = os.getenv("ART_INSTITUTE_API_URL")
     CACHE_TTL = 3600
 
     @classmethod
@@ -25,6 +25,8 @@ class ArtInstituteService:
             return None
 
         data = response.json().get("data")
+
         if data:
             cache.set(cache_key, data, cls.CACHE_TTL)
+
         return data
