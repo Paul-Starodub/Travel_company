@@ -91,12 +91,16 @@ class TravelProjectSerializer(serializers.ModelSerializer):
     def create(self, validated_data) -> TravelProject:
         places_data = validated_data.pop("places_input", [])
         project = TravelProject.objects.create(**validated_data)
-        for place_data in places_data:
-            artwork = place_data["artwork"]
-            ProjectPlace.objects.create(
-                project=project,
-                external_id=str(artwork["id"]),
-                title=artwork["title"],
-                notes=place_data.get("notes", ""),
+        if places_data:
+            ProjectPlace.objects.bulk_create(
+                [
+                    ProjectPlace(
+                        project=project,
+                        external_id=str(place_data["artwork"]["id"]),
+                        title=place_data["artwork"]["title"],
+                        notes=place_data.get("notes", ""),
+                    )
+                    for place_data in places_data
+                ]
             )
         return project
