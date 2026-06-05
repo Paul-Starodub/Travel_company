@@ -48,6 +48,12 @@ class TravelProjectSerializer(serializers.ModelSerializer):
         model = TravelProject
         fields = ["id", "name", "description", "start_date", "is_completed", "places", "places_input"]
 
+    def get_fields(self) -> dict:
+        fields = super().get_fields()
+        if self.instance is not None:
+            fields["places_input"].required = False
+        return fields
+
     def validate_places_input(self, places_data) -> list[dict]:
         try:
             validate_places(places_data)
