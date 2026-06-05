@@ -28,7 +28,3 @@ class ArtInstituteService:
         if data:
             cache.set(cache_key, data, cls.CACHE_TTL)
         return data
-
-    # @classmethod
-    # def place_exists(cls, external_id: str) -> bool:
-    #     return cls.get_artwork(external_id) is not None
