@@ -48,8 +48,10 @@ class ProjectPlaceViewSet(
 ):
     pagination_class = StandardPagination
 
-    def _get_project(self):
-        return get_object_or_404(TravelProject, pk=self.kwargs["project_pk"])
+    def _get_project(self) -> TravelProject:
+        if not hasattr(self, "_project_cache"):
+            self._project_cache = get_object_or_404(TravelProject, pk=self.kwargs["project_pk"])
+        return self._project_cache
 
     def get_queryset(self):
         return ProjectPlace.objects.filter(project=self._get_project()).order_by("id")
