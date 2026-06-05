@@ -3,7 +3,7 @@ from rest_framework import serializers
 
 from apps.projects.exceptions import PlaceValidationError
 from apps.projects.models import ProjectPlace, TravelProject
-from apps.projects.services.place_service import bulk_create_places, validate_and_enrich_places
+from apps.projects.services.place_service import bulk_create_places, enrich_with_artwork, validate_places
 
 
 class ProjectPlaceReadSerializer(serializers.ModelSerializer):
@@ -22,7 +22,8 @@ class ProjectPlaceCreateSerializer(serializers.Serializer):
 
     def validate(self, attrs) -> dict:
         try:
-            attrs["places"] = validate_and_enrich_places(attrs["places"], project=self.context["project"])
+            validate_places(attrs["places"], project=self.context["project"])
+            attrs["places"] = enrich_with_artwork(attrs["places"])
         except PlaceValidationError as e:
             raise serializers.ValidationError(str(e))
         return attrs
@@ -49,7 +50,8 @@ class TravelProjectSerializer(serializers.ModelSerializer):
 
     def validate_places_input(self, places_data) -> list[dict]:
         try:
-            return validate_and_enrich_places(places_data)
+            validate_places(places_data)
+            return enrich_with_artwork(places_data)
         except PlaceValidationError as e:
             raise serializers.ValidationError(str(e))
 

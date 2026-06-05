@@ -3,6 +3,8 @@ import os
 import requests
 from django.core.cache import cache
 
+from apps.projects.exceptions import ExternalServiceError
+
 
 class ArtInstituteService:
     BASE_URL = os.getenv("ART_INSTITUTE_API_URL")
@@ -18,15 +20,16 @@ class ArtInstituteService:
         try:
             url = f"{cls.BASE_URL}/artworks/{external_id}?fields=id,title"
             response = requests.get(url, timeout=10)
-        except requests.RequestException:
+        except requests.RequestException as e:
+            raise ExternalServiceError("Art Institute API is currently unavailable.") from e
+
+        if response.status_code == 404:
             return None
 
-        if response.status_code != 200:
-            return None
+        if not response.ok:
+            raise ExternalServiceError(f"Art Institute API returned unexpected status {response.status_code}.")
 
         data = response.json().get("data")
-
         if data:
             cache.set(cache_key, data, cls.CACHE_TTL)
-
         return data
