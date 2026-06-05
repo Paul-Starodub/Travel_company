@@ -41,7 +41,7 @@ class ProjectPlaceUpdateSerializer(serializers.ModelSerializer):
 
 class TravelProjectSerializer(serializers.ModelSerializer):
     places = ProjectPlaceReadSerializer(many=True, read_only=True)
-    places_input = PlaceInputSerializer(many=True, write_only=True, required=False)
+    places_input = PlaceInputSerializer(many=True, write_only=True, min_length=1)
     is_completed = serializers.BooleanField(read_only=True)
 
     class Meta:
@@ -57,8 +57,7 @@ class TravelProjectSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data) -> TravelProject:
-        places_data = validated_data.pop("places_input", [])
+        places_data = validated_data.pop("places_input")
         project = TravelProject.objects.create(**validated_data)
-        if places_data:
-            bulk_create_places(project, places_data)
+        bulk_create_places(project, places_data)
         return project
