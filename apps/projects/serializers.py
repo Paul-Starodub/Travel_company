@@ -43,15 +43,17 @@ class ProjectPlaceCreateSerializer(serializers.Serializer):
     @transaction.atomic
     def save(self, **kwargs) -> list[ProjectPlace]:
         project = self.context["project"]
-        return [
-            ProjectPlace.objects.create(
-                project=project,
-                external_id=str(item["artwork"]["id"]),
-                title=item["artwork"]["title"],
-                notes=item.get("notes", ""),
-            )
-            for item in self.validated_data["places"]
-        ]
+        return ProjectPlace.objects.bulk_create(
+            [
+                ProjectPlace(
+                    project=project,
+                    external_id=str(item["artwork"]["id"]),
+                    title=item["artwork"]["title"],
+                    notes=item.get("notes", ""),
+                )
+                for item in self.validated_data["places"]
+            ]
+        )
 
 
 class ProjectPlaceUpdateSerializer(serializers.ModelSerializer):
