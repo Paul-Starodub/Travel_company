@@ -6,7 +6,6 @@ from rest_framework.response import Response
 from apps.common.paginators import StandardPagination
 from apps.projects.models import ProjectPlace, TravelProject
 from apps.projects.serializers import (
-    ProjectPlaceBulkCreateSerializer,
     ProjectPlaceCreateSerializer,
     ProjectPlaceReadSerializer,
     ProjectPlaceUpdateSerializer,
@@ -70,19 +69,11 @@ class ProjectPlaceViewSet(
         return context
 
     def create(self, request, *args, **kwargs) -> Response:
-        if isinstance(request.data, list):
-            serializer = ProjectPlaceBulkCreateSerializer(
-                data={"places": request.data},
-                context=self.get_serializer_context(),
-            )
-            serializer.is_valid(raise_exception=True)
-            places = serializer.save()
-            return Response(ProjectPlaceReadSerializer(places, many=True).data, status=status.HTTP_201_CREATED)
-
-        serializer = self.get_serializer(data=request.data)
+        raw = request.data if isinstance(request.data, list) else [request.data]
+        serializer = self.get_serializer(data={"places": raw}, context=self.get_serializer_context())
         serializer.is_valid(raise_exception=True)
-        place = serializer.save()
-        return Response(ProjectPlaceReadSerializer(place).data, status=status.HTTP_201_CREATED)
+        places = serializer.save()
+        return Response(ProjectPlaceReadSerializer(places, many=True).data, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs) -> Response:
         partial = kwargs.pop("partial", False)

@@ -17,33 +17,6 @@ class PlaceInputSerializer(serializers.Serializer):
 
 
 class ProjectPlaceCreateSerializer(serializers.Serializer):
-    external_id = serializers.CharField()
-    notes = serializers.CharField(required=False, allow_blank=True, default="")
-
-    def validate(self, attrs) -> dict:
-        project = self.context["project"]
-        artwork = ArtInstituteService.get_artwork(attrs["external_id"])
-        if not artwork:
-            raise serializers.ValidationError({"external_id": "Place not found in Art Institute API."})
-        if project.places.count() >= 10:
-            raise serializers.ValidationError("Project already has the maximum of 10 places.")
-        if project.places.filter(external_id=attrs["external_id"]).exists():
-            raise serializers.ValidationError({"external_id": "This place is already in the project."})
-        attrs["artwork"] = artwork
-        return attrs
-
-    def save(self, **kwargs) -> ProjectPlace:
-        project = self.context["project"]
-        artwork = self.validated_data["artwork"]
-        return ProjectPlace.objects.create(
-            project=project,
-            external_id=str(artwork["id"]),
-            title=artwork["title"],
-            notes=self.validated_data.get("notes", ""),
-        )
-
-
-class ProjectPlaceBulkCreateSerializer(serializers.Serializer):
     places = PlaceInputSerializer(many=True, min_length=1)
 
     def validate(self, attrs) -> dict:
@@ -51,7 +24,7 @@ class ProjectPlaceBulkCreateSerializer(serializers.Serializer):
         items = attrs["places"]
         if project.places.count() + len(items) > 10:
             raise serializers.ValidationError(f"Adding {len(items)} place(s) would exceed the maximum of 10.")
-        seen_ids = set()
+        seen_ids: set[str] = set()
         enriched = []
         for item in items:
             eid = item["external_id"]
