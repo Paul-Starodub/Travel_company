@@ -19,8 +19,7 @@ class TravelProjectViewSet(viewsets.ModelViewSet):
     pagination_class = StandardPagination
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["name", "description"]
-    ordering_fields = ["created_at", "start_date", "name"]
-    ordering = ["-created_at"]
+    ordering_fields = ["start_date", "name"]
 
     def get_queryset(self):
         qs = TravelProject.objects.all()
