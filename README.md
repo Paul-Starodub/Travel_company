@@ -145,21 +145,6 @@ GET /api/auth/users/me/
 | `PATCH` | `/api/projects/{id}/` | Partial update of a project |
 | `DELETE` | `/api/projects/{id}/` | Delete a project |
 
-#### Create a project (without places)
-
-```http
-POST /api/projects/
-```
-
-```json
-{
-  "name": "Italy Trip",
-  "description": "Art tour across Italy",
-  "start_date": "2026-09-01"
-}
-```
-
-`description` and `start_date` are optional.
 
 #### Create a project with places
 
@@ -177,6 +162,8 @@ POST /api/projects/
   ]
 }
 ```
+
+`description` and `start_date` are optional.
 
 #### List projects — query parameters
 
