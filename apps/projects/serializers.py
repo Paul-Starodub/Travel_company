@@ -94,17 +94,7 @@ class TravelProjectSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TravelProject
-        fields = [
-            "id",
-            "name",
-            "description",
-            "start_date",
-            "is_completed",
-            "created_at",
-            "updated_at",
-            "places",
-            "places_input",
-        ]
+        fields = ["id", "name", "description", "start_date", "is_completed", "places", "places_input"]
 
     def validate_places_input(self, places_data) -> list[dict]:
         if len(places_data) > 10:
