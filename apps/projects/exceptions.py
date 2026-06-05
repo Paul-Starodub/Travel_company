@@ -1,0 +1,2 @@
+class PlaceValidationError(ValueError):
+    pass

@@ -1,6 +1,7 @@
 from django.db import transaction
 from rest_framework import serializers
 
+from apps.projects.exceptions import PlaceValidationError
 from apps.projects.models import ProjectPlace, TravelProject
 from apps.projects.services.place_service import bulk_create_places, validate_and_enrich_places
 
@@ -20,7 +21,10 @@ class ProjectPlaceCreateSerializer(serializers.Serializer):
     places = PlaceInputSerializer(many=True, min_length=1)
 
     def validate(self, attrs) -> dict:
-        attrs["places"] = validate_and_enrich_places(attrs["places"], project=self.context["project"])
+        try:
+            attrs["places"] = validate_and_enrich_places(attrs["places"], project=self.context["project"])
+        except PlaceValidationError as e:
+            raise serializers.ValidationError(str(e))
         return attrs
 
     @transaction.atomic
@@ -44,7 +48,10 @@ class TravelProjectSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "description", "start_date", "is_completed", "places", "places_input"]
 
     def validate_places_input(self, places_data) -> list[dict]:
-        return validate_and_enrich_places(places_data)
+        try:
+            return validate_and_enrich_places(places_data)
+        except PlaceValidationError as e:
+            raise serializers.ValidationError(str(e))
 
     @transaction.atomic
     def create(self, validated_data) -> TravelProject:
