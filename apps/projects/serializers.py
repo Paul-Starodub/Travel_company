@@ -5,6 +5,39 @@ from apps.projects.models import ProjectPlace, TravelProject
 from apps.projects.services.art_institute_service import ArtInstituteService
 
 
+def _validate_and_enrich_places(items: list[dict], project: TravelProject | None = None) -> list[dict]:
+    existing_count = project.places.count() if project else 0
+    if existing_count + len(items) > 10:
+        raise serializers.ValidationError(f"Adding {len(items)} place(s) would exceed the maximum of 10.")
+
+    seen_ids: set[str] = set()
+    enriched = []
+    for item in items:
+        eid = item["external_id"]
+        if eid in seen_ids:
+            raise serializers.ValidationError(f"Duplicate place '{eid}' in the request.")
+        seen_ids.add(eid)
+        if project and project.places.filter(external_id=eid).exists():
+            raise serializers.ValidationError(f"Place '{eid}' is already in the project.")
+        artwork = ArtInstituteService.get_artwork(eid)
+        if not artwork:
+            raise serializers.ValidationError(f"Place '{eid}' not found in Art Institute API.")
+        enriched.append({**item, "artwork": artwork})
+    return enriched
+
+
+def _bulk_create_places(project: TravelProject, places_data: list[dict]) -> list[ProjectPlace]:
+    return ProjectPlace.objects.bulk_create([
+        ProjectPlace(
+            project=project,
+            external_id=str(item["artwork"]["id"]),
+            title=item["artwork"]["title"],
+            notes=item.get("notes", ""),
+        )
+        for item in places_data
+    ])
+
+
 class ProjectPlaceReadSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectPlace
@@ -20,40 +53,12 @@ class ProjectPlaceCreateSerializer(serializers.Serializer):
     places = PlaceInputSerializer(many=True, min_length=1)
 
     def validate(self, attrs) -> dict:
-        project = self.context["project"]
-        items = attrs["places"]
-        if project.places.count() + len(items) > 10:
-            raise serializers.ValidationError(f"Adding {len(items)} place(s) would exceed the maximum of 10.")
-        seen_ids: set[str] = set()
-        enriched = []
-        for item in items:
-            eid = item["external_id"]
-            if eid in seen_ids:
-                raise serializers.ValidationError(f"Duplicate place '{eid}' in the request.")
-            seen_ids.add(eid)
-            if project.places.filter(external_id=eid).exists():
-                raise serializers.ValidationError(f"Place '{eid}' is already in the project.")
-            artwork = ArtInstituteService.get_artwork(eid)
-            if not artwork:
-                raise serializers.ValidationError(f"Place '{eid}' not found in Art Institute API.")
-            enriched.append({**item, "artwork": artwork})
-        attrs["places"] = enriched
+        attrs["places"] = _validate_and_enrich_places(attrs["places"], project=self.context["project"])
         return attrs
 
     @transaction.atomic
     def save(self, **kwargs) -> list[ProjectPlace]:
-        project = self.context["project"]
-        return ProjectPlace.objects.bulk_create(
-            [
-                ProjectPlace(
-                    project=project,
-                    external_id=str(item["artwork"]["id"]),
-                    title=item["artwork"]["title"],
-                    notes=item.get("notes", ""),
-                )
-                for item in self.validated_data["places"]
-            ]
-        )
+        return _bulk_create_places(self.context["project"], self.validated_data["places"])
 
 
 class ProjectPlaceUpdateSerializer(serializers.ModelSerializer):
@@ -72,35 +77,12 @@ class TravelProjectSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "description", "start_date", "is_completed", "places", "places_input"]
 
     def validate_places_input(self, places_data) -> list[dict]:
-        if len(places_data) > 10:
-            raise serializers.ValidationError("A project can have at most 10 places.")
-        seen_ids = set()
-        enriched = []
-        for place_data in places_data:
-            eid = place_data["external_id"]
-            if eid in seen_ids:
-                raise serializers.ValidationError(f"Duplicate place '{eid}' in the request.")
-            seen_ids.add(eid)
-            artwork = ArtInstituteService.get_artwork(eid)
-            if not artwork:
-                raise serializers.ValidationError(f"Place '{eid}' not found in Art Institute API.")
-            enriched.append({**place_data, "artwork": artwork})
-        return enriched
+        return _validate_and_enrich_places(places_data)
 
     @transaction.atomic
     def create(self, validated_data) -> TravelProject:
         places_data = validated_data.pop("places_input", [])
         project = TravelProject.objects.create(**validated_data)
         if places_data:
-            ProjectPlace.objects.bulk_create(
-                [
-                    ProjectPlace(
-                        project=project,
-                        external_id=str(place_data["artwork"]["id"]),
-                        title=place_data["artwork"]["title"],
-                        notes=place_data.get("notes", ""),
-                    )
-                    for place_data in places_data
-                ]
-            )
+            _bulk_create_places(project, places_data)
         return project
