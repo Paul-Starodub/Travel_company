@@ -15,27 +15,25 @@ class ProjectPlaceCreateSerializer(serializers.Serializer):
     external_id = serializers.CharField()
     notes = serializers.CharField(required=False, allow_blank=True, default="")
 
-    def validate_external_id(self, value):
-        artwork = ArtInstituteService.get_artwork(value)
-        if not artwork:
-            raise serializers.ValidationError("Place not found in Art Institute API.")
-        self._artwork = artwork
-        return value
-
-    def validate(self, attrs):
+    def validate(self, attrs) -> dict:
         project = self.context["project"]
+        artwork = ArtInstituteService.get_artwork(attrs["external_id"])
+        if not artwork:
+            raise serializers.ValidationError({"external_id": "Place not found in Art Institute API."})
         if project.places.count() >= 10:
             raise serializers.ValidationError("Project already has the maximum of 10 places.")
         if project.places.filter(external_id=attrs["external_id"]).exists():
-            raise serializers.ValidationError("This place is already in the project.")
+            raise serializers.ValidationError({"external_id": "This place is already in the project."})
+        attrs["artwork"] = artwork
         return attrs
 
     def save(self, **kwargs) -> ProjectPlace:
         project = self.context["project"]
+        artwork = self.validated_data["artwork"]
         return ProjectPlace.objects.create(
             project=project,
-            external_id=str(self._artwork["id"]),
-            title=self._artwork["title"],
+            external_id=str(artwork["id"]),
+            title=artwork["title"],
             notes=self.validated_data.get("notes", ""),
         )
 
@@ -69,39 +67,33 @@ class TravelProjectSerializer(serializers.ModelSerializer):
             "places",
             "places_input",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
 
-    def validate_places_input(self, places_data):
+    def validate_places_input(self, places_data) -> list[dict]:
         if len(places_data) > 10:
             raise serializers.ValidationError("A project can have at most 10 places.")
-
         seen_ids = set()
-        artworks = []
+        enriched = []
         for place_data in places_data:
             eid = place_data["external_id"]
             if eid in seen_ids:
                 raise serializers.ValidationError(f"Duplicate place '{eid}' in the request.")
             seen_ids.add(eid)
-
             artwork = ArtInstituteService.get_artwork(eid)
             if not artwork:
                 raise serializers.ValidationError(f"Place '{eid}' not found in Art Institute API.")
-            artworks.append((place_data, artwork))
-
-        self._validated_artworks = artworks
-        return places_data
+            enriched.append({**place_data, "artwork": artwork})
+        return enriched
 
     @transaction.atomic
-    def create(self, validated_data):
-        validated_data.pop("places_input", [])
+    def create(self, validated_data) -> TravelProject:
+        places_data = validated_data.pop("places_input", [])
         project = TravelProject.objects.create(**validated_data)
-
-        for place_data, artwork in getattr(self, "_validated_artworks", []):
+        for place_data in places_data:
+            artwork = place_data["artwork"]
             ProjectPlace.objects.create(
                 project=project,
                 external_id=str(artwork["id"]),
                 title=artwork["title"],
                 notes=place_data.get("notes", ""),
             )
-
         return project
