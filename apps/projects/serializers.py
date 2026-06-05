@@ -9,7 +9,6 @@ def _validate_and_enrich_places(items: list[dict], project: TravelProject | None
     existing_count = project.places.count() if project else 0
     if existing_count + len(items) > 10:
         raise serializers.ValidationError(f"Adding {len(items)} place(s) would exceed the maximum of 10.")
-
     seen_ids: set[str] = set()
     enriched = []
     for item in items:
@@ -27,15 +26,17 @@ def _validate_and_enrich_places(items: list[dict], project: TravelProject | None
 
 
 def _bulk_create_places(project: TravelProject, places_data: list[dict]) -> list[ProjectPlace]:
-    return ProjectPlace.objects.bulk_create([
-        ProjectPlace(
-            project=project,
-            external_id=str(item["artwork"]["id"]),
-            title=item["artwork"]["title"],
-            notes=item.get("notes", ""),
-        )
-        for item in places_data
-    ])
+    return ProjectPlace.objects.bulk_create(
+        [
+            ProjectPlace(
+                project=project,
+                external_id=str(item["artwork"]["id"]),
+                title=item["artwork"]["title"],
+                notes=item.get("notes", ""),
+            )
+            for item in places_data
+        ]
+    )
 
 
 class ProjectPlaceReadSerializer(serializers.ModelSerializer):
