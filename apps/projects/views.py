@@ -53,7 +53,7 @@ class ProjectPlaceViewSet(
         return get_object_or_404(TravelProject, pk=self.kwargs["project_pk"])
 
     def get_queryset(self):
-        return ProjectPlace.objects.filter(project=self._get_project()).order_by("created_at")
+        return ProjectPlace.objects.filter(project=self._get_project())
 
     def get_serializer_class(self):
         match self.action:
