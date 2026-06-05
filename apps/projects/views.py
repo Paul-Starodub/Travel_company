@@ -1,4 +1,7 @@
+from functools import cached_property
+
 from django.db import transaction
+from django.db.models import Exists, OuterRef, Q
 from django.shortcuts import get_object_or_404
 from rest_framework import filters, mixins, status, viewsets
 from rest_framework.response import Response
@@ -24,8 +27,13 @@ class TravelProjectViewSet(viewsets.ModelViewSet):
         qs = TravelProject.objects.prefetch_related("places")
         completed = self.request.query_params.get("completed")
         if completed is not None:
-            flag = completed.lower() == "true"
-            qs = [project for project in qs if project.is_completed == flag]
+            has_places = Exists(ProjectPlace.objects.filter(project=OuterRef("pk")))
+            has_unvisited = Exists(ProjectPlace.objects.filter(project=OuterRef("pk"), visited=False))
+            qs = qs.annotate(has_places=has_places, has_unvisited=has_unvisited)
+            if completed.lower() == "true":
+                qs = qs.filter(has_places=True, has_unvisited=False)
+            else:
+                qs = qs.filter(Q(has_places=False) | Q(has_unvisited=True))
         return qs
 
     @transaction.atomic
@@ -48,13 +56,12 @@ class ProjectPlaceViewSet(
 ):
     pagination_class = StandardPagination
 
-    def _get_project(self) -> TravelProject:
-        if not hasattr(self, "_project_cache"):
-            self._project_cache = get_object_or_404(TravelProject, pk=self.kwargs["project_pk"])
-        return self._project_cache
+    @cached_property
+    def _project(self) -> TravelProject:
+        return get_object_or_404(TravelProject, pk=self.kwargs["project_pk"])
 
     def get_queryset(self):
-        return ProjectPlace.objects.filter(project=self._get_project()).order_by("id")
+        return ProjectPlace.objects.filter(project=self._project).order_by("id")
 
     def get_serializer_class(self):
         match self.action:
@@ -67,7 +74,7 @@ class ProjectPlaceViewSet(
 
     def get_serializer_context(self) -> dict:
         context = super().get_serializer_context()
-        context["project"] = self._get_project()
+        context["project"] = self._project
         return context
 
     def create(self, request, *args, **kwargs) -> Response:
