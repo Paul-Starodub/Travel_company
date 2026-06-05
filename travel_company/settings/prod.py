@@ -4,7 +4,7 @@ DEBUG = False
 
 DATABASES["default"]["OPTIONS"] = {"sslmode": "require"}
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = ["yourdomain.com"]
 
 # CORS
 
