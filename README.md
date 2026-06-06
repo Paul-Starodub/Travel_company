@@ -50,6 +50,15 @@ docker compose exec web python manage.py createsuperuser
 
 ---
 
+## Running Tests
+
+Run the full test suite inside the Docker container:
+
+```bash
+docker compose exec web python manage.py test
+```
+
+
 ## API Documentation
 
 Interactive docs are available after starting the server:
