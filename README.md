@@ -156,6 +156,7 @@ POST /api/projects/
 {
   "name": "Italy Trip",
   "start_date": "2026-09-01",
+  "description": "The beautiful place",
   "places_input": [
     { "external_id": "27992", "notes": "Must see the main hall" },
     { "external_id": "11434" }
